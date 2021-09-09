@@ -68,7 +68,8 @@ def cross_correlate_iff(x):
 
     input_complex = tf.dtypes.complex(x[:,:,:,:input_channel], x[:,:,:,input_channel:])
     input_transposed = tf.transpose(input_complex, [0,3,1,2])
-    output_complex = tf.math.real(tf.signal.fftshift(tf.signal.ifft2d(input_transposed)))
+    #output_complex = tf.math.real(tf.signal.ifft2d(input_transposed))
+    output_complex = tf.math.real(tf.signal.fftshift(tf.signal.ifft2d(input_transposed), axes=(2,3)))
     output = tf.transpose(output_complex, [0,2,3,1])
     
     return output
