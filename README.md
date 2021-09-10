@@ -1,3 +1,3 @@
 # crystal4D
 
-Complex convolution network and spectral pooling used for pixel-wise mapping
+Package for complex convolution network and spectral pooling used for pixel-wise mapping of diffraction space images
