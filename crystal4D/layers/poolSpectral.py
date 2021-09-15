@@ -257,7 +257,7 @@ class ComplexSpectralMaxPool2D(Layer):
     im_fft = transpose(im_fft, [0,3,1,2])
     
     filter_size = self._get_sp_dim(self.img_size)
-    filter_size = math.multiply(self.gamma, filter_size)
+    #filter_size = math.multiply(self.gamma, filter_size)
     im_transformed = self._spectral_pool(im_fft, filter_size)
     
     freq_dropout_lower_bound, freq_dropout_upper_bound = self._get_frq_dropout_bounds(filter_size, self.kappa)

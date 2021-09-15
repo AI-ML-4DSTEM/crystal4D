@@ -70,8 +70,10 @@ class parseDataset(object):
             ds = tfr_dataset.map(self._parse_tfr_element_multiHead)
         elif mode == 'multihead_norm':
             ds = tfr_dataset.map(self._parse_tfr_element_norm_multiHead)
+        #Added through version 0.0.6 release
+        elif mode == 'classification':
+            ds = tfr_dataset.map(self._parse_tfr_element_classification)
         
-    
         if shuffle:
             SHUFFLE_BUFFER_SIZE = 10000
             ds = ds.shuffle(SHUFFLE_BUFFER_SIZE)
@@ -233,6 +235,27 @@ class parseDataset(object):
         qz_out = tf.expand_dims(pot[:,:,1], axis=-1)
         
         return ((cbed,probe),(self._replace_nan(pot_out),self._replace_nan(qz_out)))
+    
+    def _parse_tfr_element_classification(self, element):
+        #Added through version 0.0.6 release
+        parse_dic = {
+            'pot_feature': tf.io.FixedLenFeature([], tf.string),
+            'group': tf.io.FixedLenFeature([], tf.int64),
+            'system': tf.io.FixedLenFeature([], tf.int64)}
+        example_message = tf.io.parse_single_example(element, parse_dic)
+
+        pot_feature = example_message['pot_feature']
+        pot = tf.io.parse_tensor(pot_feature, out_type=tf.float32)
+        pot.set_shape([self.height, self.width, self.out_channel])
+        out_min = tf.reduce_min(pot, axis = [0,1])
+        out_max = tf.reduce_max(pot, axis = [0,1])
+        assert(out_min.shape == out_max.shape == self.out_channel)
+        pot = (pot-out_min)/(out_max - out_min)
+        
+        group = example_message['group']
+        system = example_message['system']
+        
+        return (self._replace_nan(pot), group, system)
     
     def _replace_nan(self,tensor):
         return tf.where(tf.math.is_nan(tensor), tf.zeros_like(tensor), tensor)

@@ -6,7 +6,7 @@ import tensorflow_addons as tfa
 
 #Custom libraries - User defined
 from ..utils import conv_utils
-from ..layers import poolSpectral
+from ..layers import poolSpectral, multiTaskLayer
 from ..utils.data_utils import parseDataset
 from ..utils.conv_utils import convSpec2d_block, conv2d_block
 from ..utils.conv_utils import cross_correlate_iff, cross_correlate_ff, cross_correlate
