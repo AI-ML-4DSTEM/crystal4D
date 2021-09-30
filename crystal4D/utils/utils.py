@@ -6,6 +6,13 @@ import tensorflow as tf
 #Utility helper functions: custom learning rate scheduler, custom optimizers and other custom 
 #functions can be defined here
 
+def load_trained_model(model_type = 'fcunet'):
+    model_path = '../model_weights/fcunet_strain_mapping_weights_latest/'
+    print('loading latest trained disk detection model {} \n'.format(model_path))
+    model = tf.keras.models.load_model(model_path,
+                                       custom_objects={'lrScheduler': lrScheduler(128)})
+    return model
+
 class lrScheduler(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, d_model, alpha =10, warmup_steps=50, name=None):
         super(lrScheduler, self).__init__()
