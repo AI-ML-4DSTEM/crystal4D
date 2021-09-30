@@ -80,6 +80,24 @@ class MonteCarloDropout(tf.keras.layers.Dropout):
     def call(self, inputs):
         return super().call(inputs, training=True)
 
+def conv2d_block(input_tensor, n_filters, n_depth=2, input_channel=1, kernel_size = 3, activation = 'relu', dp_rate = 0.1, batchnorm = True):
+    """Function to add n (depth) convolutional layers with the parameters passed to it"""
+    
+    kl = 'he_uniform'
+    if batchnorm:
+        x = tf.keras.layers.BatchNormalization()(input_tensor)
+    else:
+        x = input_tensor
+    
+    for _ in range(n_depth):
+        x = tf.keras.layers.Conv2D(filters = n_filters, kernel_size = (kernel_size, kernel_size),             
+                               padding = 'same', kernel_initializer = kl, bias_initializer = kl, kernel_regularizer= 'l2', bias_regularizer= 'l2')(x)
+        if batchnorm:
+            x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation(activation)(x)
+        x = MonteCarloDropout(dp_rate)(x)
+    
+    return x
 
 def convSpec2d_block(input_tensor, n_filters, n_depth=2, input_channel=1, kernel_size = 3, activation = 'relu', dp_rate = 0.1, batchnorm = True):
     """Function to add n (depth) complex convolutional layers with the parameters passed to it"""
@@ -94,26 +112,6 @@ def convSpec2d_block(input_tensor, n_filters, n_depth=2, input_channel=1, kernel
     for _ in range(n_depth):
         x = convSpectral.ConvComplex2D(rank=2, filters = n_filters, kernel_size = (kernel_size, kernel_size),
                                 padding = 'same', kernel_initializer = kl, bias_initializer = kl, kernel_regularizer= 'l2', bias_regularizer= 'l2')(x)
-        if batchnorm:
-            x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Activation(activation)(x)
-        x = MonteCarloDropout(dp_rate)(x)
-    
-    return x
-
-
-def conv2d_block(input_tensor, n_filters, n_depth=2, input_channel=1, kernel_size = 3, activation = 'relu', dp_rate = 0.1, batchnorm = True):
-    """Function to add n (depth) convolutional layers with the parameters passed to it"""
-    
-    kl = 'he_uniform'
-    if batchnorm:
-        x = tf.keras.layers.BatchNormalization()(input_tensor)
-    else:
-        x = input_tensor
-    
-    for _ in range(n_depth):
-        x = tf.keras.layers.Conv2D(filters = n_filters, kernel_size = (kernel_size, kernel_size),             
-                               padding = 'same', kernel_initializer = kl, bias_initializer = kl, kernel_regularizer= 'l2', bias_regularizer= 'l2')(x)
         if batchnorm:
             x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation(activation)(x)

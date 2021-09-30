@@ -1,3 +1,5 @@
+#Author: Joydeep Munshi
+#Augmentation utility funciton for crystal4D
 """
 This is augmentation pipeline for 4DSTEM/STEM diffraction (CBED) images. The different available augmentation includes elliptic distrotion, plasmonic background noise and poisson shot noise. The elliptic distortion is recommeded to be applied on CBED, Probe, Potential Vg and Qz tilts while other noise are only applied on CBED input.
 """
@@ -9,69 +11,74 @@ import numpy.matlib as nm
 from itertools import product
 from ..utils import aug_utils
 from .interpolate import dense_image_warp
-#from skimage.filters import gaussian
-#from scipy.interpolate import griddata
 
 from tensorflow.python.framework import tensor_shape
 
 class image_augmentation(object):
     def __init__(self, 
-                 backgrnd = True,
-                 shot =True,
-                 pattern_shift = True,
-                 ellipticity = True,
+                 backgrnd = False,
+                 shot =False,
+                 pattern_shift = False,
+                 ellipticity = False,
                  counts_per_pixel = 1000,
                  qBackgroundLorentz = 0.1,
                  weightBackgrnd = 0.1,
                  scale = 1.0,
-                 seed = None,
+                 xshift = 1,
+                 yshift = 1,
                  verbose = False,
                  log_file = './logs/augment_log.csv'):
         self.backgrnd = backgrnd
         self.shot = shot
         self.pattern_shift = pattern_shift
         self.ellipticity = ellipticity
-        self.counts_per_pixel = counts_per_pixel
-        self.qBackgroundLorentz = qBackgroundLorentz
-        self.weightBackgrnd = weightBackgrnd
-        self.scale = scale
+        
+        if self.backgrnd:
+            print('background')
+            self.weightBackgrnd = weightBackgrnd
+            self.qBackgroundLorentz = qBackgroundLorentz
+        if self.shot:
+            self.counts_per_pixel = counts_per_pixel
+        if self.pattern_shift:
+            self.xshift = xshift
+            self.yshift = yshift
+        if self.ellipticity:
+            self.scale = scale
+        
         self.verbose = verbose
         self.log_file = log_file
         
         file_object = open(self.log_file, 'a')
-        file_object.write('ellipticity,shot,background \n')
+        file_object.write('ellipticity,shot,background,pattern_shift \n')
         file_object.close()
 
     def set_params(self, 
-                 backgrnd = None, 
-                 shot =None, 
-                 pattern_shift = None,
-                 ellipticity = None,
-                 counts_per_pixel = None,
-                 qBackgroundLorentz = None,
-                 weightBackgrnd = None,
-                 scale = None,
-                 seed = None):
+                 backgrnd = True, 
+                 shot =True, 
+                 pattern_shift = True,
+                 ellipticity = True,
+                 counts_per_pixel = 1000,
+                 qBackgroundLorentz = 0.1,
+                 weightBackgrnd = 0.1,
+                 scale = 1.0,
+                 xshift = 1,
+                 yshift = 1):
         
-        if backgrnd is not None:
-            self.backgrnd = backgrnd
-        if shot is not None:
-            self.shot = shot
-        if pattern_shift is not None:
-            self.pattern_shift = pattern_shift
-        if ellipticity is not None:
-            self.ellipticity = ellipticity
-            
-        if counts_per_pixel is not None:
-            if self.shot:
-                self.counts_per_pixel = counts_per_pixel
-        if weightBackgrnd is not None and qBackgroundLorentz is not None:
-            if self.backgrnd:
-                self.weightBackgrnd = weightBackgrnd
-                self.qBackgroundLorentz = qBackgroundLorentz
-        if scale is not None:
-            if self.ellipticity:
-                self.scale = scale
+        self.backgrnd = backgrnd
+        self.shot = shot
+        self.pattern_shift = pattern_shift
+        self.ellipticity = ellipticity
+        
+        if self.backgrnd:
+            self.weightBackgrnd = weightBackgrnd
+            self.qBackgroundLorentz = qBackgroundLorentz
+        if self.shot:
+            self.counts_per_pixel = counts_per_pixel
+        if self.pattern_shift:
+            self.xshift = xshift
+            self.yshift = yshift
+        if self.ellipticity:
+            self.scale = scale
         
     def get_params(self): 
         print('Printing augmentation summary... \n',end = "\r")
@@ -79,26 +86,55 @@ class image_augmentation(object):
         print('Shots per pixel: {} \n'.format(self.counts_per_pixel),end = "\r")
         print('Background plasmon: {} \n'.format(self.qBackgroundLorentz),end = "\r")
         print('Ellipticity scaling: {} \n'.format(self.scale),end = "\r")
+        print('Pattern shift: {},{} \n'.format(self.xshift,self.yshift),end = "\r")
         print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n', end = "\r")
         
     
     def write_logs(self):
         file_object = open(self.log_file, 'a')
-        file_object.write('{},{},{} \n'.format(self.ellipticity,self.shot,self.backgrnd))
+        file_object.write('{},{},{},{} \n'.format(self.ellipticity,self.shot,self.backgrnd,self.pattern_shift))
         file_object.close()
         
 
     def _get_dim(self, x, idx):
         if x.shape.ndims is None:
             return tf.shape(x)[idx]
-        return x.shape[idx] or tf.shape(x)[idx]    
+        return x.shape[idx] or tf.shape(x)[idx]
+    
+    
+    def _get_qx_qy(self, input_shape, pixel_size_AA = 0.20):
+        """
+        get qx,qy from cbed
+        """
+        N = input_shape
+        qx = np.sort(np.fft.fftfreq(N[0], pixel_size_AA)).reshape((N[0], 1, 1))
+        qy = np.sort(np.fft.fftfreq(N[1], pixel_size_AA)).reshape((1, N[1], 1))
+        
+        return qx, qy
+    
+    def _make_fourier_coord(self, Nx, Ny, pixelSize):
+        """
+        Generates Fourier coordinates for a (Nx,Ny)-shaped 2D array.
+        Specifying the pixelSize argument sets a unit size.
+        """
+        if hasattr(pixelSize, '__len__'):
+            assert len(pixelSize) == 2, "pixelSize must either be a scalar or have length 2"
+            pixelSize_x = pixelSize[0]
+            pixelSize_y = pixelSize[1]
+        else:
+            pixelSize_x = pixelSize
+            pixelSize_y = pixelSize
+
+        qx = np.fft.fftfreq(Nx, pixelSize_x)
+        qy = np.fft.fftfreq(Ny, pixelSize_y)
+        qy, qx = np.meshgrid(qy, qx)
+        return qx, qy
     
     @tf.function
     def augment_img(self, inputs: aug_utils.TensorLike, probe = None):
         start_time = time.time()
         input_shape = inputs.shape
         if self.backgrnd:
-            #TODO: Background plasmons
             input_noise = self.backgrnd_plasmon(inputs, probe)
         else:
             input_noise = inputs
@@ -109,13 +145,16 @@ class image_augmentation(object):
             input_noise = self.shot_noise(input_noise)
         else:
             self.counts_per_pixel = 0
-            
+               
+        ################
         if self.pattern_shift:
-            #TODO: Pattern shift for cbed
-            pass
+            #Added on 09/22/2021 - Joydeep Munshi
+            input_noise = self.pattern_shift_ar(input_noise)
+        else:
+            self.xhsift = 0
+            self.yshift = 0
         
         if self.ellipticity:
-            #TODO: Implement elpticity for probe and cbed
             input_noise = self.elliptic_distort(input_noise)
         else:
             self.scale = 0
@@ -145,9 +184,12 @@ class image_augmentation(object):
     
     @tf.function
     def shot_noise(self, inputs: aug_utils.TensorLike):
-        #input_shape = inputs.shape
-        image_scale = self.scale_image(inputs)
-        image_noise = tf.random.poisson(shape = [], lam = tf.maximum(image_scale,0) * self.counts_per_pixel)/float(self.counts_per_pixel)
+        """
+        Apply Shot noise
+        """
+        image = tf.convert_to_tensor(inputs)
+        #image_scale = self.scale_image(inputs)
+        image_noise = tf.random.poisson(shape = [], lam = tf.maximum(image,0) * self.counts_per_pixel)/float(self.counts_per_pixel)
         
         return image_noise
     
@@ -213,7 +255,8 @@ class image_augmentation(object):
 
         CBEDbg = tf.expand_dims(CBEDbg, axis=0)
         CBEDbg = tf.repeat(CBEDbg, batch_size, axis=0)
-        CBEDbg = tf.expand_dims(CBEDbg, axis=3)
+        CBEDbg = tf.expand_dims(CBEDbg, axis=-1)
+        CBEDbg = tf.repeat(CBEDbg, channels, axis=0)
         
         CBEDbg = tf.keras.backend.permute_dimensions(CBEDbg, (3,0,1,2))
         probe = tf.keras.backend.permute_dimensions(probe, (3,0,1,2))
@@ -228,14 +271,27 @@ class image_augmentation(object):
         CBEDout = tf.cast(inputs, tf.float32) * (1-self.weightBackgrnd) + tf.cast(CBEDbgConv, tf.float32) * self.weightBackgrnd
         
         return CBEDout
-        
-    def _get_qx_qy(self, input_shape, pixel_size_AA = 0.20):
+    
+    @tf.function
+    def pattern_shift_ar(self, inputs: aug_utils.TensorLike):
         """
-        get qx,qy from cbed
+        Apply pixel shift to the pattern using Fourier shift theorem for subpixel shifting
         """
-        N = input_shape
-        #pixel_size_AA = example.realspacePixelSizeX * 2
-        qx = np.sort(np.fft.fftfreq(N[0], pixel_size_AA)).reshape((N[0], 1, 1))
-        qy = np.sort(np.fft.fftfreq(N[1], pixel_size_AA)).reshape((1, N[1], 1))
+        image = tf.convert_to_tensor(inputs)
+        batch_size, height, width, channels = (
+            self._get_dim(image, 0),
+            self._get_dim(image, 1),
+            self._get_dim(image, 2),
+            self._get_dim(image, 3),
+        )
         
-        return qx, qy
+        qx, qy = self._make_fourier_coord(height, width, 1)
+        
+        ar = tf.cast(tf.keras.backend.permute_dimensions(image, (0,3,1,2)), tf.complex64)
+
+        w = np.exp(-(2j * np.pi) * ((self.yshift * qy) + (self.xshift * qx)))
+        shifted_ar = tf.math.real(tf.signal.ifft2d(tf.math.multiply(tf.signal.fft2d(ar), w)))
+        
+        shifted_ar = tf.keras.backend.permute_dimensions(shifted_ar, (0,2,3,1))
+        
+        return shifted_ar

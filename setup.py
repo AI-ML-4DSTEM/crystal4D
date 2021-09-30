@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="crystal4D",                     # This is the name of the package
-    version="0.0.1",                        # The initial release version
+    version="0.1.3",                        # The initial release version
     author="Joydeep Munshi",                     # Full name of the author
     description="Deep learning useful information from diffraction images",
     long_description=long_description,      # Long description read from the the readme file
@@ -22,8 +22,5 @@ setuptools.setup(
     package_dir={'':'./'},     # Directory of the source code of the package
     install_requires=[
         'numpy >= 1.19',
-        'matplotlib == 3.4.2',
-        'tensorflow == 2.4.1',
-        'tensorflow-addons == 0.11.2'
-        ]
+        'matplotlib >= 3.4.2']
 )
