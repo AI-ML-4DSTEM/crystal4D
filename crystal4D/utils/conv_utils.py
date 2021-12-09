@@ -51,7 +51,7 @@ def cross_correlate_ff(x):
     probe = tf.signal.fft2d(tf.cast(pr,tf.complex64))
     
     ccff = tf.multiply(cbed, tf.math.conj(probe))
-    #cc = tf.math.real(tf.signal.ifft2d(ccff))
+    ccff = tf.signal.fftshift(ccff, axes = (2,3))
     ccff = tf.keras.backend.permute_dimensions(ccff, (1,2,3,0))
     
     #normalize each cross-corr
@@ -68,8 +68,8 @@ def cross_correlate_iff(x):
 
     input_complex = tf.dtypes.complex(x[:,:,:,:input_channel], x[:,:,:,input_channel:])
     input_transposed = tf.transpose(input_complex, [0,3,1,2])
-    #output_complex = tf.math.real(tf.signal.ifft2d(input_transposed))
-    output_complex = tf.math.real(tf.signal.fftshift(tf.signal.ifft2d(input_transposed), axes=(2,3)))
+    input_transposed = tf.signal.fftshift(input_transposed, axes = (2,3))
+    output_complex = tf.math.real(tf.signal.ifftshift(tf.signal.ifft2d(input_transposed), axes = (2,3)))
     output = tf.transpose(output_complex, [0,2,3,1])
     
     return output
