@@ -8,12 +8,26 @@ The recommended installation for crystal4D uses the Anaconda python distribution
 First, download and install Anaconda. Instructions can be found at www.anaconda.com/download.
 Then open a terminal and run
 
+For Linux/Unix with CUDA capability
+
 ```
 conda update conda
 conda create -n crystal4D python==3.8
 conda activate crystal4D
 conda install tensorflow-gpu==2.4.1
 conda install pip
+pip install tensorflow-addons
+pip install crystal4D==0.1.7
+```
+
+For Windows and Mac
+
+```
+conda update conda
+conda create -n crystal4D python==3.8
+conda activate crystal4D
+conda install pip
+pip install tensorflow==2.4.1
 pip install tensorflow-addons
 pip install crystal4D==0.1.7
 ```
