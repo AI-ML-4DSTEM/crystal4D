@@ -34,7 +34,7 @@ pip install crystal4D==0.1.7
 
 In order, these commands
 - ensure your installation of anaconda is up-to-date
-- make a virtual environment - see below!
+- make a virtual environment - see above!
 - enter the environment
 - make sure your new environment talks nicely to pip, a tool for installing Python packages
 - use pip to install crystal4D
