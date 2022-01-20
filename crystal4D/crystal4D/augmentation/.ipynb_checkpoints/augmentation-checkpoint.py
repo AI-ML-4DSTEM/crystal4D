@@ -1,7 +1,7 @@
 #Author: Joydeep Munshi
 #Augmentation utility funciton for crystal4D
 """
-This is augmentation pipeline for 4DSTEM/STEM diffraction (CBED) images. The different available augmentation includes elliptic distrotion, random pixel shifts, plasmonic background noise, x-ray/bad/hot pixels and poisson shot noise. The elliptic distortion is recommeded to be applied on CBED, Probe, Potential Vg and Qz tilts while other noise are only applied on CBED input.
+This is augmentation pipeline for 4DSTEM/STEM diffraction (CBED) images. The different available augmentation includes elliptic distrotion, plasmonic background noise and poisson shot noise. The elliptic distortion is recommeded to be applied on CBED, Probe, Potential Vg and Qz tilts while other noise are only applied on CBED input.
 """
 import time
 import numpy as np
@@ -20,7 +20,6 @@ class image_augmentation(object):
                  shot =False,
                  pattern_shift = False,
                  ellipticity = False,
-                 hot_pixel = False,
                  counts_per_pixel = 1000,
                  qBackgroundLorentz = 0.1,
                  weightBackgrnd = 0.1,
@@ -33,7 +32,6 @@ class image_augmentation(object):
         self.shot = shot
         self.pattern_shift = pattern_shift
         self.ellipticity = ellipticity
-        self.hot_pixel = hot_pixel
         
         if self.backgrnd:
             print('background')
@@ -50,17 +48,15 @@ class image_augmentation(object):
         self.verbose = verbose
         self.log_file = log_file
         
-        if self.verbose:
-            file_object = open(self.log_file, 'a')
-            file_object.write('ellipticity,pattern_shift,background,poisson,hot_pixel \n')
-            file_object.close()
+        file_object = open(self.log_file, 'a')
+        file_object.write('ellipticity,shot,background,pattern_shift \n')
+        file_object.close()
 
     def set_params(self, 
                  backgrnd = True, 
                  shot =True, 
                  pattern_shift = True,
                  ellipticity = True,
-                 hot_pixel = True,
                  counts_per_pixel = 1000,
                  qBackgroundLorentz = 0.1,
                  weightBackgrnd = 0.1,
@@ -72,7 +68,6 @@ class image_augmentation(object):
         self.shot = shot
         self.pattern_shift = pattern_shift
         self.ellipticity = ellipticity
-        self.hot_pixel = hot_pixel
         
         if self.backgrnd:
             self.weightBackgrnd = weightBackgrnd
@@ -97,7 +92,7 @@ class image_augmentation(object):
     
     def write_logs(self):
         file_object = open(self.log_file, 'a')
-        file_object.write('{},{},{},{},{} \n'.format(self.ellipticity,self.pattern_shift,self.backgrnd,self.shot,self.hot_pixel))
+        file_object.write('{},{},{},{} \n'.format(self.ellipticity,self.shot,self.backgrnd,self.pattern_shift))
         file_object.close()
         
 
@@ -137,35 +132,12 @@ class image_augmentation(object):
     
     @tf.function
     def augment_img(self, inputs: aug_utils.TensorLike, probe = None):
-        '''
-        Here would be my suggested order:
-        1 - ellipticity
-        2 - shift
-        3 - background
-        4 - poisson
-        5 - hot pixels / dead pixels
-        '''
         start_time = time.time()
         input_shape = inputs.shape
-        
-        if self.ellipticity:
-            input_noise = self.elliptic_distort(inputs)
+        if self.backgrnd:
+            input_noise = self.backgrnd_plasmon(inputs, probe)
         else:
             input_noise = inputs
-            self.scale = 0
-            
-        ################
-        if self.pattern_shift:
-            #TODO: Pattern shift for cbed 
-            #09/22/2021 - Joydeep Munshi
-            input_noise = self.pattern_shift_ar_roll(input_noise)
-        else:
-            self.xhsift = 0
-            self.yshift = 0
-        
-        if self.backgrnd:
-            input_noise = self.backgrnd_plasmon(input_noise, probe)
-        else:
             self.weightBackgrnd = 0
             self.qBackgroundLorentz = 0
         
@@ -173,9 +145,19 @@ class image_augmentation(object):
             input_noise = self.shot_noise(input_noise)
         else:
             self.counts_per_pixel = 0
-            
-        if self.hot_pixel:
-            input_noise = self.hot_pixel_noise(input_noise)
+               
+        ################
+        if self.pattern_shift:
+            #Added on 09/22/2021 - Joydeep Munshi
+            input_noise = self.pattern_shift_ar(input_noise)
+        else:
+            self.xhsift = 0
+            self.yshift = 0
+        
+        if self.ellipticity:
+            input_noise = self.elliptic_distort(input_noise)
+        else:
+            self.scale = 0
         
         t = time.time() - start_time
         t = t/60
@@ -184,6 +166,8 @@ class image_augmentation(object):
             self.get_params()
             self.write_logs()
             print('Augmentation Status: it took {} minutes to augment {} images... \n'.format(t, input_shape[0]), end = "\r")
+        else:
+            self.write_logs()
             
         return input_noise
     
@@ -213,7 +197,7 @@ class image_augmentation(object):
     def elliptic_distort(
         self, inputs: aug_utils.TensorLike):
         """
-        Apply Elliptic distortion
+        Elliptic distortion
         """
         image = tf.convert_to_tensor(inputs)
         batch_size, height, width, channels = (
@@ -311,49 +295,3 @@ class image_augmentation(object):
         shifted_ar = tf.keras.backend.permute_dimensions(shifted_ar, (0,2,3,1))
         
         return shifted_ar
-    
-    @tf.function
-    def pattern_shift_ar_roll(self, inputs: aug_utils.TensorLike):
-        """
-        Apply pixel shift to the pattern using Fourier shift theorem for subpixel shifting
-        """
-        image = tf.convert_to_tensor(inputs)
-        batch_size, height, width, channels = (
-            self._get_dim(image, 0),
-            self._get_dim(image, 1),
-            self._get_dim(image, 2),
-            self._get_dim(image, 3),
-        )
-        
-        shifted_ar = tf.roll(image, [self.xshift,self.yshift], axis = (1,2))
-        
-        return shifted_ar
-    
-    
-    @tf.function
-    def hot_pixel_noise(self, inputs: aug_utils.TensorLike):
-        """
-        Apply random hot/dead pixels in CBED (Do not apply this to probe/potential)
-        """
-        image = tf.convert_to_tensor(inputs)
-        #image_max = tf.math.reduce_max(image).numpy()
-        image_noise = tf.zeros_like(image, dtype=tf.float32)
-        hot_val_ar = tf.zeros_like(image, dtype=tf.float32)
-        batch_size, height, width, channels = (
-            self._get_dim(image, 0),
-            self._get_dim(image, 1),
-            self._get_dim(image, 2),
-            self._get_dim(image, 3),
-        )
-        
-        #trial = np.random.randint(10)+1
-        for i in range(10):
-            pixel_x = np.random.randint(255-1)
-            pixel_y = np.random.randint(255-1)
-            hot_pixel = tf.constant(5.0, shape=(batch_size,1,1,channels)) + tf.random.uniform(shape = (batch_size,1,1,channels))
-            paddings = tf.constant([[0, 0], [pixel_x, height-pixel_x-1], [pixel_y, width-pixel_y-1], [0, 0]])
-            hot_val_ar += tf.cast(tf.pad(hot_pixel,paddings), dtype=tf.float32)
-        image_noise = image + hot_val_ar
-        
-        return image_noise
-    

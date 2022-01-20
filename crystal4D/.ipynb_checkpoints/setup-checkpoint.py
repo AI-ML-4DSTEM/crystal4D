@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="crystal4D",                     # This is the name of the package
-    version="0.1.4",                        # The initial release version
+    version="0.1.2",                        # The initial release version
     author="Joydeep Munshi",                     # Full name of the author
     description="Deep learning useful information from diffraction images",
     long_description=long_description,      # Long description read from the the readme file
