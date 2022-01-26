@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="crystal4D",                     # This is the name of the package
-    version="0.1.4",                        # The initial release version
+    version="0.1.7",                        # The initial release version
     author="Joydeep Munshi",                     # Full name of the author
     description="Deep learning useful information from diffraction images",
     long_description=long_description,      # Long description read from the the readme file
@@ -17,7 +17,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],                                      # Information to filter the project on PyPi website
-    python_requires='>=3.6',                # Minimum version requirement of the package
+    python_requires='>=3.8',                # Minimum version requirement of the package
     py_modules=["crystal4D"],             # Name of the python package
     package_dir={'':'./'},     # Directory of the source code of the package
     install_requires=[

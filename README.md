@@ -15,7 +15,19 @@ conda activate crystal4D
 conda install tensorflow-gpu==2.4.1
 conda install pip
 pip install tensorflow-addons
-pip install crystal4D==0.1.3
+pip install crystal4D
+```
+
+For mac OS X, please run
+
+```
+conda update conda
+conda create -n crystal4D python==3.8
+conda activate crystal4D
+conda install pip
+pip install tensorflow==2.4.1
+pip install tensorflow-addons
+pip install crystal4D
 ```
 
 In order, these commands
